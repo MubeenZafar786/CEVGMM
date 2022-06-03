@@ -1,0 +1,118 @@
+/// Verilog Code for CEVGMM 
+/// Library Files
+`include "constants.h"
+`include "disciplines.vams"
+nature distance 
+  access = Metr;
+  units = "m";
+  abstol = 0.01n;
+endnature
+discipline Distance
+  potential distance;
+enddiscipline
+ 
+module Memristor(p, n,w_position);
+  input p;//positive pin
+  output n;//negative pin
+  output w_position;// w-width pin
+  electrical p, n,gnd;
+  Distance w_position;
+  ground gnd;
+////Parametr Define//////
+parameter real dt=0;                      
+parameter real init_state=1;           
+parameter real D = 1e-8;
+parameter real uv = 1e-15;
+parameter real w_multiplied = 1e8;
+parameter real R = 190;
+parameter real v_on = 1;
+parameter real v_off = -1;
+parameter real Amp = 1; 
+parameter real M = 1e-19;
+parameter real N = 1e-24; 
+parameter real A = 1;
+parameter real B = 1;
+parameter real Q = 1;   
+ 
+//////// Main Code//////////
+analog begin                                                 
+     if(first_iteration==0) begin
+        w_last=init_state*D;    
+        x_last=init_state*D;    
+    end
+    
+///// State Variable Relationship//////
+ 
+     if (V(p,n) <0) && (V(p,n)<v_on)) begin 
+        dxdt =N*sinh(V(p,n)+A);
+    end
+ 
+    if (V(p,n)>0) && (V(p,n)>v_off)) begin
+        dxdt =M*exp(V(p,n)-B);
+    end
+        if ((v_on<V(p,n)) && (V(p,n)<v_off)) begin
+    dxdt=0;
+    end
+
+///// Ideal window Function  ///// 
+   if (x>=D) begin
+    dxdt=0;             
+    x=D;
+    end 
+    if (x<=0) begin
+    dxdt=0;
+    x=0;
+    end 
+///// I-V Relationship ///////////////                
+begin 
+V(p,n) <+ (IR(x)+0.25*ln(I(p,n))(1-x); 
+end                                                                                  
+endmodule
+
+%%%%%NOR Gate%%%%%%%%%%%%%%%
+.subckt orgate input1 input2 output
+xmem1 output input1 memristorr1
+xmem2 output input2 memristorr1
+.ends
+.subckt notgate input output
+.MODEL n1 NMOS LEVEL=54
+.MODEL p1 PMOS LEVEL=54
+vPower VPower GND 5V
+M1 output input Vpower p1
+M2 output input gnd n1
+.ends
+.subckt norgate input1 input2 finaloutput
+x3 input1 input2 output orgate
+x4 output finaloutput notgate
+.ends
+v1 input1 0 PULSE 0 1 15N .1N .2N 15N 10N
+v2 input2 0 PULSE 0 1 5N .1N .1N 20N 20N
+x5 input1 input2 finaloutput norgate
+.options post runlvl=0 lvltim=1 method=gear captab
+.TRAN 1n 50n
+.probe i(x*.*) v(x*.*) 
+.end
+
+%%%%%NAND Gate%%%%%%%%%%%%%%%
+.subckt andgate input1 input2 output
+xmem1 input1 output memristorr1
+xmem2 input2 output memristorr1
+.ends
+.subckt notgate input output
+.MODEL n1 NMOS LEVEL=54
+.MODEL p1 PMOS LEVEL=54
+vPower VPower GND 5V
+M1 output input Vpower p1
+M2 output input gnd n1
+.ends
+.subckt nandgate input1 input2 finaloutput
+x3 input1 input2 output orgate
+x4 output finaloutput notgate
+.ends
+v1 input1 0 PULSE 0 1 15N .1N .2N 15N 10N
+v2 input2 0 PULSE 0 1 5N .1N .1N 20N 20N
+x5 input1 input2 finaloutput norgate
+.options post runlvl=0 lvltim=1 method=gear captab
+.TRAN 1n 50n
+.probe i(x*.*) v(x*.*) 
+.end
